@@ -1,6 +1,6 @@
 # Import the pygame module
 import pygame
-import time
+
 
 # Import random for random numbers
 import random
@@ -26,6 +26,18 @@ SCREEN_HEIGHT = 600
 
 DISPLAY_GAME = True
 
+vec = pygame.math.Vector2
+
+
+pygame.init()
+
+# Setup the clock for a decent framerate
+clock = pygame.time.Clock()
+
+# Create the screen object
+# The size is determined by the constant SCREEN_WIDTH and SCREEN_HEIGHT
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
 # Define the Player object extending pygame.sprite.Sprite
 # Instead of a surface, we use an image for a better looking sprite
 class Player(pygame.sprite.Sprite):
@@ -34,17 +46,20 @@ class Player(pygame.sprite.Sprite):
         self.surf = pygame.image.load("jet.png").convert()
         self.surf.set_colorkey((255, 255, 255), RLEACCEL)
         self.rect = self.surf.get_rect()
+        print("State:"+"("+str(self.rect[0])+","+str(self.rect[1])+")")
+        self.action = None
+        self.vel = random.random()
 
     # Move the sprite based on keypresses
     def update(self, pressed_keys):
         if pressed_keys[K_UP]:
-            self.rect.move_ip(0, -5)
+            self.rect.move_ip(0, -10+self.vel)
         if pressed_keys[K_DOWN]:
-            self.rect.move_ip(0, 5)
+            self.rect.move_ip(0, 5+self.vel)
         if pressed_keys[K_LEFT]:
-            self.rect.move_ip(-5, 0)
+            self.rect.move_ip(-5+self.vel, 0)
         if pressed_keys[K_RIGHT]:
-            self.rect.move_ip(5, 0)
+            self.rect.move_ip(5+self.vel, 0)
 
         # Keep player on the screen
         if self.rect.left < 0:
@@ -56,8 +71,33 @@ class Player(pygame.sprite.Sprite):
         elif self.rect.bottom >= SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
 
+        self.action="DOWN"
+        if pressed_keys[K_UP] and not pressed_keys[K_DOWN] and not pressed_keys[K_LEFT] and not pressed_keys[K_RIGHT]:
+            self.action = "UP"
+        if not pressed_keys[K_UP] and pressed_keys[K_DOWN] and not pressed_keys[K_LEFT] and not pressed_keys[K_RIGHT]:
+            self.action = "DOWN"
+        if not pressed_keys[K_UP] and not pressed_keys[K_DOWN] and pressed_keys[K_LEFT] and not pressed_keys[K_RIGHT]:
+            self.action = "LEFT"
+        if not pressed_keys[K_UP] and not pressed_keys[K_DOWN] and not pressed_keys[K_LEFT] and pressed_keys[K_RIGHT]:
+            self.action = "RIGHT"
+        if pressed_keys[K_UP] and not pressed_keys[K_DOWN] and pressed_keys[K_LEFT] and not pressed_keys[K_RIGHT]:
+            self.action = "UP-LEFT"
+        if not pressed_keys[K_UP] and pressed_keys[K_DOWN] and pressed_keys[K_LEFT] and not pressed_keys[K_RIGHT]:
+            self.action = "DOWN-LEFT"
+        if pressed_keys[K_UP] and not pressed_keys[K_DOWN] and not pressed_keys[K_LEFT] and pressed_keys[K_RIGHT]:
+            self.action = "UP-RIGHT"
+        if not pressed_keys[K_UP] and pressed_keys[K_DOWN] and not pressed_keys[K_LEFT] and pressed_keys[K_RIGHT]:
+            self.action = "DOWN-RIGHT"
+        if pressed_keys[K_UP] and pressed_keys[K_DOWN] and not pressed_keys[K_LEFT] and not pressed_keys[K_RIGHT]:
+            self.action = "UP"
 
-# Define the enemy object extending pygame.sprite.Sprite
+        print("State:"+"("+str(self.rect[0])+","+str(self.rect[1])+")"+"   Action: " + str(self.action))
+
+    def gravity(self):
+        self.rect.move_ip(0, 5)
+        #print("("+str(self.rect[0])+","+str(self.rect[1])+")"+"   Action: None")
+
+
 # Instead of a surface, we use an image for a better looking sprite
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
@@ -82,16 +122,6 @@ class Enemy(pygame.sprite.Sprite):
 
 # Our main loop
 def main():
-    # Initialize pygame
-    pygame.init()
-
-    # Setup the clock for a decent framerate
-    clock = pygame.time.Clock()
-
-    # Create the screen object
-    # The size is determined by the constant SCREEN_WIDTH and SCREEN_HEIGHT
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-
     # Create custom events for adding a new enemy and cloud
     ADDENEMY = pygame.USEREVENT + 1
     pygame.time.set_timer(ADDENEMY, 1000)
@@ -133,9 +163,19 @@ def main():
             screen.blit(text, (x1, y1))
             y1 += 60
 
+    def show_trans(rect1,action1):
+        myfont1 = pygame.font.SysFont("freesansbold", 20)
+        textX1 = 600
+        textY1 = 10
+        transition = [str("State:" + "(" + str(rect1[0]) + "," + str(rect1[1]) + ")"), str("Action: " + str(action1))]
+        for i in transition:
+            text = myfont1.render(i, True, (255, 255, 255))
+            screen.blit(text, (textX1, textY1))
+            textY1 += 25
+
     while running:
         # Look at every event in the queue
-        if score < 500:
+        if score < 501:
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     # Was it the Escape key? If so, stop the loop
@@ -158,6 +198,7 @@ def main():
             # Get the set of keys pressed and check for user input
             pressed_keys = pygame.key.get_pressed()
             player.update(pressed_keys)
+            player.gravity()
 
             # Update the position of our enemies and clouds
             enemies.update()
@@ -179,7 +220,9 @@ def main():
 
             #score display
             show_score(textX, textY,score)
+            show_trans(player.rect, player.action)
             score += 1
+            act = player.action
 
         else:
             for event in pygame.event.get():
@@ -187,17 +230,21 @@ def main():
                     # Was it the Escape key? If so, stop the loop
                     if event.key == K_ESCAPE:
                         running = False
+                        print("State:" + "(" + str(player.rect[0]) + "," + str(
+                            player.rect[1]) + ")" + "   Action: " + str(act)+ "   Reward: " + "+10" )
                     elif event.key == K_SPACE:
                         main()
 
                 # Did the user click the window close button? If so, stop the loop
                 elif event.type == QUIT:
+                    print("State:" + "(" + str(player.rect[0]) + "," + str(
+                        player.rect[1]) + ")" + "   Action: " + str(act))
                     running = False
 
             screen.fill((135, 206, 250))
             show_win(textA, textB, score)
-
             show_score(textX, textY, score)
+            show_trans(player.rect, act)
 
         # Flip everything to the display
         if DISPLAY_GAME == True:
